@@ -9,18 +9,27 @@ import os
 st.set_page_config(page_title="TechLogistics S.A. | DSS", layout="wide")
 st.title("📦 TechLogistics S.A. - Sistema de Soporte a la Decisión")
 
-# Carga y caché de datos
-@st.cache_data
-def load_data():
-    return procesar_datos(
-        'data/inventario_central_v2.csv',
-        'data/transacciones_logistica_v2.csv',
-        'data/feedback_clientes_v2.csv'
-    )
+# --- CARGA DE ARCHIVOS POR EL USUARIO ---
+st.sidebar.header("📁 Carga de Datasets")
+file_inv = st.sidebar.file_uploader("Sube inventario_central_v2.csv", type=["csv"])
+file_trans = st.sidebar.file_uploader("Sube transacciones_logistica_v2.csv", type=["csv"])
+file_feed = st.sidebar.file_uploader("Sube feedback_clientes_v2.csv", type=["csv"])
 
-df, outliers, h_antes, h_despues = load_data()
+# Detener la ejecución si no están los 3 archivos
+if not (file_inv and file_trans and file_feed):
+    st.warning("⚠️ Por favor, carga los 3 archivos CSV en la barra lateral para habilitar el análisis.")
+    st.stop()
+
+# Carga y caché de datos usando los archivos subidos
+@st.cache_data
+def load_data(f_inv, f_trans, f_feed):
+    # data_processor.py debe estar configurado para recibir estos objetos de archivo
+    return procesar_datos(f_inv, f_trans, f_feed)
+
+df, outliers, h_antes, h_despues = load_data(file_inv, file_trans, file_feed)
 
 # --- BARRA LATERAL ---
+st.sidebar.divider()
 st.sidebar.header("Filtros Estratégicos")
 df_filtrado = df.copy()
 

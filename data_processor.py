@@ -1,7 +1,6 @@
 import pandas as pd
 import numpy as np
 from datetime import datetime
-import re
 
 def calcular_health_score(df):
     total_filas = len(df)
@@ -9,11 +8,11 @@ def calcular_health_score(df):
     filas_completas = df.dropna().shape[0]
     return round((filas_completas / total_filas) * 100, 2)
 
-def procesar_datos(ruta_inv, ruta_trans, ruta_feed):
-    # 1. Carga de datos
-    inv = pd.read_csv(ruta_inv)
-    trans = pd.read_csv(ruta_trans)
-    feed = pd.read_csv(ruta_feed)
+def procesar_datos(f_inv, f_trans, f_feed):
+    # 1. Carga de datos (aceptando directamente los archivos de Streamlit)
+    inv = pd.read_csv(f_inv)
+    trans = pd.read_csv(f_trans)
+    feed = pd.read_csv(f_feed)
 
     health_antes = {
         "Inventario": calcular_health_score(inv),
@@ -39,7 +38,7 @@ def procesar_datos(ruta_inv, ruta_trans, ruta_feed):
     # Filtro de fechas futuras
     trans = trans[trans['Fecha_Venta'] <= pd.to_datetime(datetime.now())]
     
-    # Normalización de variables categóricas (Ciudades) usando Regex
+    # Normalización de variables categóricas (Ciudades)
     diccionario_ciudades = {
         r'(?i)^med.*': 'Medellín',
         r'(?i)^bog.*': 'Bogotá',
@@ -52,22 +51,24 @@ def procesar_datos(ruta_inv, ruta_trans, ruta_feed):
     # 4. Limpieza de Feedback
     feed = feed.drop_duplicates()
     feed['Satisfaccion_NPS'] = pd.to_numeric(feed['Satisfaccion_NPS'], errors='coerce')
-    # Limpieza de edades imposibles u otros errores numéricos que afecten el join
     
     # 5. Integración (Left Join Estratégico)
-    # Join 1: Transacciones + Inventario
     df = trans.merge(inv, on='SKU_ID', how='left', indicator='_merge_inv')
     df['Venta_Fantasma'] = df['_merge_inv'] == 'left_only'
     
-    # Join 2: + Feedback
     df = df.merge(feed, on='Transaccion_ID', how='left')
 
     # 6. Feature Engineering (Variables Derivadas)
     df['Ingreso_Total'] = df['Precio_Venta_Final'] * df['Cantidad_Vendida']
     df['Costo_Total'] = df['Costo_Unitario_USD'] * df['Cantidad_Vendida']
     df['Margen_Utilidad'] = df['Ingreso_Total'] - df['Costo_Total'] - df['Costo_Envio']
-    df['Brecha_Entrega'] = df['Tiempo_Entrega'] - df['Lead_Time_Dias']
-    df['Tiene_Ticket'] = np.where(df['Ticket_Soporte'].astype(str).str.lower() == 'si', 1, 0)
+    
+    # CORRECCIÓN DE NOMBRES DE VARIABLES
+    df['Brecha_Entrega'] = df['Tiempo_Entrega_Real'] - df['Lead_Time_Dias']
+    
+    # Limpieza robusta del ticket (Maneja variaciones como 'Sí', 'Si', '1', '0', 'No')
+    df['Tiene_Ticket'] = df['Ticket_Soporte_Abierto'].astype(str).str.lower().isin(['si', 'sí', '1', 'true']).astype(int)
+    
     df['Dias_Desde_Revision'] = (pd.to_datetime(datetime.now()) - df['Ultima_Revision']).dt.days
 
     health_despues = {

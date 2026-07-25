@@ -23,7 +23,6 @@ if not (file_inv and file_trans and file_feed):
 # Carga y caché de datos usando los archivos subidos
 @st.cache_data
 def load_data(f_inv, f_trans, f_feed):
-    # data_processor.py debe estar configurado para recibir estos objetos de archivo
     return procesar_datos(f_inv, f_trans, f_feed)
 
 df, outliers, h_antes, h_despues = load_data(file_inv, file_trans, file_feed)
@@ -113,9 +112,9 @@ with tab3:
     
     # Q2: Crisis Logística y Cuellos de Botella
     st.subheader("2. Correlación: Tiempo de Entrega vs NPS por Ciudad")
-    df_q2 = df_filtrado.groupby(['Ciudad_Destino', 'Bodega_Origen']).agg({'Tiempo_Entrega':'mean', 'Satisfaccion_NPS':'mean'}).reset_index()
+    df_q2 = df_filtrado.groupby(['Ciudad_Destino', 'Bodega_Origen']).agg({'Tiempo_Entrega_Real':'mean', 'Satisfaccion_NPS':'mean'}).reset_index()
     fig_q2 = px.scatter(
-        df_q2, x='Tiempo_Entrega', y='Satisfaccion_NPS', color='Ciudad_Destino', hover_data=['Bodega_Origen'],
+        df_q2, x='Tiempo_Entrega_Real', y='Satisfaccion_NPS', color='Ciudad_Destino', hover_data=['Bodega_Origen'],
         title="Impacto del Tiempo de Entrega en el NPS"
     )
     st.plotly_chart(fig_q2, use_container_width=True)
@@ -140,7 +139,7 @@ with tab4:
             Ventas totales filtradas: {len(df_filtrado)}. 
             Margen Promedio: {df_filtrado['Margen_Utilidad'].mean():.2f}. 
             NPS Promedio: {df_filtrado['Satisfaccion_NPS'].mean():.2f}.
-            Tiempo de entrega promedio: {df_filtrado['Tiempo_Entrega'].mean():.2f} días.
+            Tiempo de entrega promedio: {df_filtrado['Tiempo_Entrega_Real'].mean():.2f} días.
             """
             
             cliente = Groq(api_key=st.secrets["GROQ_API_KEY"])

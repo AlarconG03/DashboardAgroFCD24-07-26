@@ -180,7 +180,7 @@ tab_datos, tab_eda, tab_pregunta, tab_apoyo, tab_reporte = st.tabs(
 # ---------------------------------------------------------
 with tab_datos:
     st.subheader("Vista previa de los datos")
-    st.dataframe(df.head(20), use_container_width=True)
+    st.dataframe(df.head(20), use_container_width=True, key="df_preview")
 
     c1, c2, c3 = st.columns(3)
     c1.metric("Filas", df.shape[0])
@@ -191,6 +191,7 @@ with tab_datos:
     st.dataframe(
         pd.DataFrame({"Columna": df.dtypes.index, "Tipo": df.dtypes.astype(str).values}),
         use_container_width=True,
+        key="df_dtypes",
     )
 
     st.subheader("Valores nulos por columna")
@@ -203,7 +204,7 @@ with tab_datos:
             title="Valores faltantes por columna", color=nulos.values,
             color_continuous_scale="Reds",
         )
-        st.plotly_chart(fig_nulos, use_container_width=True)
+        st.plotly_chart(fig_nulos, use_container_width=True, key="chart_nulos")
     else:
         st.success("✅ No se encontraron valores nulos en el dataset.")
 
@@ -213,17 +214,17 @@ with tab_datos:
 with tab_eda:
     st.subheader("Estadística descriptiva (variables numéricas)")
     num_cols = df.select_dtypes(include=np.number).columns.tolist()
-    st.dataframe(df[num_cols].describe().T, use_container_width=True)
+    st.dataframe(df[num_cols].describe().T, use_container_width=True, key="df_describe")
 
     st.subheader("Distribución de una variable")
-    var_sel = st.selectbox("Selecciona una variable numérica", num_cols, index=num_cols.index(col_metric) if col_metric in num_cols else 0)
+    var_sel = st.selectbox("Selecciona una variable numérica", num_cols, index=num_cols.index(col_metric) if col_metric in num_cols else 0, key="select_var_num")
     colh1, colh2 = st.columns(2)
     with colh1:
         fig_hist = px.histogram(df, x=var_sel, nbins=30, marginal="box", title=f"Distribución de {var_sel}")
-        st.plotly_chart(fig_hist, use_container_width=True)
+        st.plotly_chart(fig_hist, use_container_width=True, key="chart_hist")
     with colh2:
         fig_box_all = px.box(df, y=var_sel, title=f"Boxplot general de {var_sel}", points="outliers")
-        st.plotly_chart(fig_box_all, use_container_width=True)
+        st.plotly_chart(fig_box_all, use_container_width=True, key="chart_box_all")
 
     st.subheader("Matriz de correlación")
     if len(num_cols) >= 2:
@@ -232,19 +233,19 @@ with tab_eda:
             corr, text_auto=".2f", aspect="auto", color_continuous_scale="RdBu_r",
             title="Correlación entre variables numéricas",
         )
-        st.plotly_chart(fig_corr, use_container_width=True)
+        st.plotly_chart(fig_corr, use_container_width=True, key="chart_corr")
     else:
         st.info("Se necesitan al menos 2 variables numéricas para calcular correlaciones.")
 
     st.subheader("Variables categóricas")
     cat_cols = df.select_dtypes(exclude=np.number).columns.tolist()
     if cat_cols:
-        var_cat = st.selectbox("Selecciona una variable categórica", cat_cols)
+        var_cat = st.selectbox("Selecciona una variable categórica", cat_cols, key="select_var_cat")
         conteo = df[var_cat].value_counts().reset_index()
         conteo.columns = [var_cat, "conteo"]
         fig_cat = px.bar(conteo, x=var_cat, y="conteo", title=f"Frecuencia de {var_cat}", color="conteo",
                           color_continuous_scale="Greens")
-        st.plotly_chart(fig_cat, use_container_width=True)
+        st.plotly_chart(fig_cat, use_container_width=True, key="chart_cat")
     else:
         st.info("No se detectaron variables categóricas.")
 
@@ -261,6 +262,7 @@ with tab_pregunta:
     resumen["Desv. Estándar"] = df.groupby(col_riego)[col_metric].std()
     resumen["N"] = df.groupby(col_riego)[col_metric].count()
     st.table(resumen.style.format({"Promedio": "{:.2f}", "Mediana": "{:.2f}", "Desv. Estándar": "{:.2f}"}))
+    # (Nota: st.table no soporta 'key', pero al no repetirse su contenido no genera conflicto)
 
     # --- Visualización clave: Boxplot ---
     st.markdown("### 📦 Visualización clave: Boxplot de Producción — Con Riego vs. Sin Riego")
@@ -270,14 +272,14 @@ with tab_pregunta:
         labels={col_riego: "Sistema de Riego", col_metric: metric_label},
     )
     fig_box_key.update_layout(showlegend=False)
-    st.plotly_chart(fig_box_key, use_container_width=True)
+    st.plotly_chart(fig_box_key, use_container_width=True, key="chart_box_key_pregunta")
 
     # Versión seaborn/matplotlib de respaldo
     with st.expander("Ver versión estática (seaborn)"):
         fig_sns, ax = plt.subplots(figsize=(8, 5))
         sns.boxplot(data=df, x=col_riego, y=col_metric, ax=ax, palette="Set2")
         ax.set_title(f"{metric_label} según Sistema de Riego")
-        st.pyplot(fig_sns)
+        st.pyplot(fig_sns, clear_figure=True)
 
     # --- Prueba estadística ---
     st.markdown("### 🧪 Prueba estadística")
@@ -345,7 +347,7 @@ with tab_apoyo:
         title=f"Distribución de {metric_label} por Sistema de Riego",
     )
     fig_violin.update_layout(showlegend=False)
-    st.plotly_chart(fig_violin, use_container_width=True)
+    st.plotly_chart(fig_violin, use_container_width=True, key="chart_violin")
 
     # Scatter Área vs Producción coloreado por riego
     if col_area != "(ninguna)":
@@ -355,7 +357,7 @@ with tab_apoyo:
             title="Área Sembrada vs. Producción Anual",
             labels={col_area: "Área (Hectáreas)", col_prod: "Producción (Ton)"},
         )
-        st.plotly_chart(fig_scatter, use_container_width=True)
+        st.plotly_chart(fig_scatter, use_container_width=True, key="chart_scatter")
 
     # Producción media por Cultivo y Riego
     if col_cultivo != "(ninguna)":
@@ -365,7 +367,7 @@ with tab_apoyo:
             agg, x=col_cultivo, y=col_metric, color=col_riego, barmode="group",
             title=f"{metric_label} promedio por Cultivo y Riego",
         )
-        st.plotly_chart(fig_bar_cultivo, use_container_width=True)
+        st.plotly_chart(fig_bar_cultivo, use_container_width=True, key="chart_bar_cultivo")
 
     # Boxplot por tipo de suelo
     if col_suelo != "(ninguna)":
@@ -374,7 +376,7 @@ with tab_apoyo:
             df, x=col_suelo, y=col_metric, color=col_riego,
             title=f"{metric_label} por Tipo de Suelo y Sistema de Riego",
         )
-        st.plotly_chart(fig_suelo, use_container_width=True)
+        st.plotly_chart(fig_suelo, use_container_width=True, key="chart_suelo")
 
     # Producción media por región
     if col_region != "(ninguna)":
@@ -385,7 +387,7 @@ with tab_apoyo:
             title=f"{metric_label} promedio por Región y Riego",
         )
         fig_region.update_xaxes(tickangle=45)
-        st.plotly_chart(fig_region, use_container_width=True)
+        st.plotly_chart(fig_region, use_container_width=True, key="chart_region")
 
     if col_area == "(ninguna)" and col_cultivo == "(ninguna)" and col_suelo == "(ninguna)" and col_region == "(ninguna)":
         st.info("Selecciona columnas adicionales (área, cultivo, suelo, región) en la barra lateral para desbloquear más gráficas.")
@@ -451,7 +453,7 @@ with tab_reporte:
     st.table(resumen_final.style.format({"Promedio": "{:.2f}", "Mediana": "{:.2f}", "Desv. Estándar": "{:.2f}"}))
 
     st.markdown("**Boxplot de referencia (resumen visual del hallazgo principal):**")
-    st.plotly_chart(fig_box_key, use_container_width=True)
+    st.plotly_chart(fig_box_key, use_container_width=True, key="chart_box_key_reporte")
 
     st.download_button(
         label="📥 Descargar reporte en texto",

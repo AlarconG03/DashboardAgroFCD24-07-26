@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 from datetime import datetime
+import re
 
 def calcular_health_score(df):
     total_filas = len(df)
@@ -8,8 +9,20 @@ def calcular_health_score(df):
     filas_completas = df.dropna().shape[0]
     return round((filas_completas / total_filas) * 100, 2)
 
+def limpiar_lead_time(val):
+    if pd.isna(val):
+        return np.nan
+    val_str = str(val).lower()
+    if 'inmediato' in val_str:
+        return 0.0
+    nums = re.findall(r'\d+', val_str)
+    if not nums:
+        return np.nan
+    nums = [float(n) for n in nums]
+    return sum(nums) / len(nums) # Promedia si viene en formato rango ej: '25-30'
+
 def procesar_datos(f_inv, f_trans, f_feed):
-    # 1. Carga de datos (aceptando directamente los archivos de Streamlit)
+    # 1. Carga de datos
     inv = pd.read_csv(f_inv)
     trans = pd.read_csv(f_trans)
     feed = pd.read_csv(f_feed)
@@ -25,6 +38,9 @@ def procesar_datos(f_inv, f_trans, f_feed):
     inv['Stock_Actual'] = np.where(inv['Stock_Actual'] < 0, 0, inv['Stock_Actual'])
     inv['Ultima_Revision'] = pd.to_datetime(inv['Ultima_Revision'], errors='coerce')
     
+    # Conversión robusta de Lead_Time_Dias a numérico
+    inv['Lead_Time_Dias'] = inv['Lead_Time_Dias'].apply(limpiar_lead_time)
+
     # Tratamiento de Outliers de Costo con IQR
     Q1 = inv['Costo_Unitario_USD'].quantile(0.25)
     Q3 = inv['Costo_Unitario_USD'].quantile(0.75)
@@ -35,10 +51,9 @@ def procesar_datos(f_inv, f_trans, f_feed):
     # 3. Limpieza de Transacciones
     trans = trans.drop_duplicates()
     trans['Fecha_Venta'] = pd.to_datetime(trans['Fecha_Venta'], errors='coerce')
-    # Filtro de fechas futuras
     trans = trans[trans['Fecha_Venta'] <= pd.to_datetime(datetime.now())]
     
-    # Normalización de variables categóricas (Ciudades)
+    # Normalización de ciudades
     diccionario_ciudades = {
         r'(?i)^med.*': 'Medellín',
         r'(?i)^bog.*': 'Bogotá',
@@ -63,12 +78,10 @@ def procesar_datos(f_inv, f_trans, f_feed):
     df['Costo_Total'] = df['Costo_Unitario_USD'] * df['Cantidad_Vendida']
     df['Margen_Utilidad'] = df['Ingreso_Total'] - df['Costo_Total'] - df['Costo_Envio']
     
-    # CORRECCIÓN DE NOMBRES DE VARIABLES
+    # Operación aritmética segura ahora que Lead_Time_Dias es numérico
     df['Brecha_Entrega'] = df['Tiempo_Entrega_Real'] - df['Lead_Time_Dias']
     
-    # Limpieza robusta del ticket (Maneja variaciones como 'Sí', 'Si', '1', '0', 'No')
     df['Tiene_Ticket'] = df['Ticket_Soporte_Abierto'].astype(str).str.lower().isin(['si', 'sí', '1', 'true']).astype(int)
-    
     df['Dias_Desde_Revision'] = (pd.to_datetime(datetime.now()) - df['Ultima_Revision']).dt.days
 
     health_despues = {
